@@ -1,0 +1,104 @@
+# Same project name as the earlier folder, so the downloaded YOLO weights volume (yolo_models) is REUSED
+# (slow internet: no second download). Needs Docker Compose v2.20+ (any recent Docker Desktop).
+name: cafe-monitor-work
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    image: cafe-monitor-backend:local
+    mem_limit: ${CAFE_MEMORY_LIMIT:-3g}
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DEFAULT_MODE: ${DEFAULT_MODE:-demo}
+      DATABASE_URL: ${DATABASE_URL:-sqlite:////workspace/runtime/cafe_monitor.db}
+      CAMERAS_CONFIG: /workspace/config/cameras.yaml
+      YOLO_MODEL: ${YOLO_MODEL:-/workspace/models/yolov8n.pt}
+      YOLO_AUTO_DOWNLOAD: ${YOLO_AUTO_DOWNLOAD:-true}
+      YOLO_BACKEND: ${YOLO_BACKEND:-auto}
+      YOLO_IMGSZ: ${YOLO_IMGSZ:-640}
+      YOLO_CONFIDENCE: ${YOLO_CONFIDENCE:-0.20}
+      PERSON_DETECTION_IMGSZ: ${PERSON_DETECTION_IMGSZ:-640}
+      PERSON_DETECTION_CONFIDENCE: ${PERSON_DETECTION_CONFIDENCE:-0.12}
+      PERSON_TILED_INFERENCE: ${PERSON_TILED_INFERENCE:-true}
+      MAX_RESULT_FRAME_AGE_MS: ${MAX_RESULT_FRAME_AGE_MS:-5000}
+      TORCH_NUM_THREADS: ${TORCH_NUM_THREADS:-1}
+      TORCH_INTEROP_THREADS: ${TORCH_INTEROP_THREADS:-1}
+      OPENCV_NUM_THREADS: ${OPENCV_NUM_THREADS:-1}
+      ANALYTICS_FPS: ${ANALYTICS_FPS:-0.2}
+      ENTRANCE_FPS: ${ENTRANCE_FPS:-0.5}
+      FOCUS_MAX_CAMERAS: ${FOCUS_MAX_CAMERAS:-1}
+      FOCUS_ENTRANCE_FPS: ${FOCUS_ENTRANCE_FPS:-2}
+      FOCUS_ANALYTICS_FPS: ${FOCUS_ANALYTICS_FPS:-0.2}
+      DEMO_PLAYBACK_FPS: ${DEMO_PLAYBACK_FPS:-4}
+      DISPLAY_FPS: ${DISPLAY_FPS:-1.5}
+      JPEG_QUALITY: ${JPEG_QUALITY:-50}
+      MAX_STREAM_WIDTH: ${MAX_STREAM_WIDTH:-640}
+      DEMO_USE_PROXIES: ${DEMO_USE_PROXIES:-true}
+      DEMO_PROXY_FPS: ${DEMO_PROXY_FPS:-4}
+      DEMO_PROXY_WIDTH: ${DEMO_PROXY_WIDTH:-640}
+      DEMO_PROXY_DIR: /workspace/runtime/demo_proxy
+      WS_INTERVAL_SECONDS: ${WS_INTERVAL_SECONDS:-1.0}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8080,http://127.0.0.1:8080}
+    volumes:
+      - ./data:/workspace/data
+      - ./config:/workspace/config:ro
+      - ./runtime:/workspace/runtime
+      - yolo_models:/workspace/models
+    ports:
+      - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    stop_grace_period: 20s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${DASHBOARD_PORT:-8080}:80"
+
+  # Diagnostics dashboard: http://localhost:8090  (read-only helper; never downloads weights; videos mounted read-only)
+  diagnostics:
+    image: cafe-monitor-backend:local
+    depends_on:
+      backend:
+        condition: service_started
+    command: ["uvicorn", "app.diag.main:create_app", "--factory", "--host", "0.0.0.0", "--port", "8090"]
+    mem_limit: ${DIAG_MEMORY_LIMIT:-768m}
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DEFAULT_MODE: ${DEFAULT_MODE:-demo}
+      CAMERAS_CONFIG: /workspace/config/cameras.yaml
+      YOLO_MODEL: ${YOLO_MODEL:-/workspace/models/yolov8n.pt}
+      YOLO_AUTO_DOWNLOAD: "false"
+      YOLO_BACKEND: ${YOLO_BACKEND:-auto}
+      YOLO_IMGSZ: ${YOLO_IMGSZ:-640}
+      YOLO_CONFIDENCE: ${YOLO_CONFIDENCE:-0.20}
+      PERSON_DETECTION_IMGSZ: ${PERSON_DETECTION_IMGSZ:-640}
+      PERSON_DETECTION_CONFIDENCE: ${PERSON_DETECTION_CONFIDENCE:-0.12}
+      PERSON_TILED_INFERENCE: ${PERSON_TILED_INFERENCE:-true}
+      MAX_RESULT_FRAME_AGE_MS: ${MAX_RESULT_FRAME_AGE_MS:-5000}
+      DIAG_BACKEND_URL: http://backend:8000
+    volumes:
+      - ./data:/workspace/data:ro
+      - ./config:/workspace/config:ro
+      - yolo_models:/workspace/models
+    ports:
+      - "127.0.0.1:${DIAG_PORT:-8090}:8090"
+
+volumes:
+  yolo_models:

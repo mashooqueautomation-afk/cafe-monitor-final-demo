@@ -1,0 +1,12 @@
+fastapi>=0.115,<1
+uvicorn[standard]>=0.30,<1
+opencv-python-headless>=4.9,<5
+numpy>=1.26,<3
+SQLAlchemy>=2.0,<3
+pydantic>=2.7,<3
+pydantic-settings>=2.3,<3
+PyYAML>=6.0,<7
+pytest>=8,<9
+httpx>=0.27,<1
+psutil>=5.9,<8
+ultralytics[export-openvino]>=8.3,<9

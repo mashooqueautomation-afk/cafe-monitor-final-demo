@@ -1,0 +1,15 @@
+.git
+**/.venv
+**/node_modules
+**/dist
+**/__pycache__
+**/.pytest_cache
+.env
+runtime/*
+!runtime/.gitkeep
+models/*
+*.log
+*.db
+# Client recordings and cup reference photos are bind-mounted at runtime, not built into images.
+data/client_footage/
+data/cup_dataset/raw/

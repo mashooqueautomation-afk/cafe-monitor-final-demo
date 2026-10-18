@@ -1,0 +1,83 @@
+# Add one user-authorized recording per channel under data/client_footage/ using the exact sample.mp4 filename.
+# Area labels are provisional and must be confirmed against the actual camera views.
+# Live Mode ignores all demo file paths and uses CAMERA_0N_RTSP from .env.
+demo_loop_default: true
+cameras:
+  - id: 1
+    key: nvr_camera_01_side_seating
+    name: Side Seating Area
+    subtitle: NVR CHANNEL 01
+    purpose: Side-angle dining/seating view; current-frame visible-person count only, not added to the café total because camera zones may overlap.
+    role: people_presence
+    analytics: ["People visible"]
+    demo: { file: data/client_footage/camera_01_seating/sample.mp4, loop: true }
+  - id: 2
+    key: nvr_camera_02_kitchen
+    name: Kitchen / Prep Area
+    subtitle: NVR CHANNEL 02
+    purpose: Kitchen/prep area; estimates people visible in the current frame. It cannot identify staff versus customers.
+    role: people_presence
+    analytics: ["People visible"]
+    demo: { file: data/client_footage/camera_02_kitchen/sample.mp4, loop: true }
+  - id: 3
+    key: nvr_camera_03_main_hall
+    name: Main Hall
+    subtitle: NVR CHANNEL 03
+    purpose: Wide dining area; visible-person count and approximate time in this camera zone.
+    role: people_count
+    analytics: ["People count"]
+    demo: { file: data/client_footage/camera_03_main_hall/sample.mp4, loop: true }
+  - id: 4
+    key: nvr_camera_04_seating_wide
+    name: Seating Area - Wide View
+    subtitle: NVR CHANNEL 04
+    purpose: Wide seating/patio view; table regions must be calibrated against this camera before table analytics can be trusted.
+    role: table_status
+    analytics: ["Occupied tables", "Empty tables", "Messy tables"]
+    # PROVISIONAL demo calibration from the supplied NVR Channel 04 clip (960x1088).
+    # Each region covers one visible tabletop plus nearby seating so a seated person's
+    # detection centre may fall inside the region. Validate against actual detections;
+    # these are not final client-approved table boundaries.
+    table_regions:
+      - { id: table_1, name: "Table 1", x1: 0.35, y1: 0.39, x2: 0.45, y2: 0.49 }
+      - { id: table_2, name: "Table 2", x1: 0.42, y1: 0.50, x2: 0.54, y2: 0.63 }
+      - { id: table_3, name: "Table 3", x1: 0.50, y1: 0.35, x2: 0.60, y2: 0.48 }
+      - { id: table_4, name: "Table 4", x1: 0.60, y1: 0.32, x2: 0.70, y2: 0.45 }
+      - { id: table_5, name: "Table 5", x1: 0.23, y1: 0.62, x2: 0.40, y2: 0.80 }
+    demo: { file: data/client_footage/camera_04_seating_wide/sample.mp4, loop: true }
+  - id: 5
+    key: nvr_camera_05_service_counter
+    name: Service / Prep Counter
+    subtitle: NVR CHANNEL 05
+    purpose: Service/cashier counter; estimates visible people only. Cash-drawer events and money reconciliation are not implemented.
+    role: people_presence
+    analytics: ["People visible"]
+    demo: { file: data/client_footage/camera_05_service_counter/sample.mp4, loop: true }
+  - id: 6
+    key: nvr_camera_06_beverage_counter
+    name: Beverage Counter / Cups
+    subtitle: NVR CHANNEL 06
+    purpose: Counter where several cup types are visible; generic cup detection only until a café-specific model is validated.
+    role: cup_detection
+    analytics: ["Cup count"]
+    demo: { file: data/client_footage/camera_06_beverage_counter/sample.mp4, loop: true }
+  - id: 7
+    key: nvr_camera_07_entrance
+    name: Entrance / Doorway
+    subtitle: NVR CHANNEL 07
+    purpose: Entrance doorway and nearby seating; entry/exit line is a starting calibration and must be verified on the live feed.
+    role: entry_exit
+    analytics: ["In", "Out", "Inside now"]
+    line_orientation: vertical
+    line_ratio: 0.72
+    entry_direction: right_to_left
+    demo: { file: data/client_footage/camera_07_entrance/sample.mp4, loop: true }
+
+  - id: 8
+    key: nvr_camera_08_unmapped
+    name: "NVR Channel 08 - Area Unconfirmed"
+    subtitle: "RECORDING REQUIRED"
+    purpose: "No recording is bundled for this channel. Confirm its area and purpose before assigning analytics."
+    role: none
+    analytics: []
+    demo: { file: data/client_footage/camera_08_unmapped/sample.mp4, loop: true }

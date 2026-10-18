@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cafe Monitor Diagnostics</title>
+<style>
+:root{--bg:#060b13;--panel:#0b1523;--panel2:#0e1c2e;--line:#1d3550;--text:#d6e4f2;--muted:#7d93ab;--cyan:#38d4ec;--red:#ff4d5e;--green:#3fe0a0;--amber:#f6b93b}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(1200px 600px at 50% -10%,#0d1d33,var(--bg) 60%);color:var(--text);font:14px/1.5 system-ui,Segoe UI,sans-serif;padding:16px}
+h1{font-size:20px;margin:0 0 4px}h2{font-size:16px;margin:0 0 8px}small,.muted{color:var(--muted)}
+.tabs{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0}.tab{background:var(--panel2);color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:7px 14px;cursor:pointer}
+.tab.on{background:#0f6f80;border-color:var(--cyan);color:#fff}.card{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:14px;margin-bottom:12px}
+button.go{background:#0f6f80;border:1px solid var(--cyan);color:#fff;border-radius:6px;padding:7px 14px;cursor:pointer}button:disabled{opacity:.5;cursor:wait}
+select,input{background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:6px;padding:6px 8px}input[type=number]{width:90px}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:10px}table{border-collapse:collapse;width:100%}th,td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+th{color:var(--muted);font-weight:600}.b{display:inline-block;border-radius:4px;padding:1px 8px;font-size:12px;font-weight:700}
+.ok{background:#12452f;color:var(--green)}.warn{background:#4a3a0f;color:var(--amber)}.fail{background:#4d1a22;color:var(--red)}.info{background:#173049;color:var(--cyan)}
+.OK{background:#12452f;color:var(--green)}.TIGHT{background:#4a3a0f;color:var(--amber)}.OVERLOAD{background:#4d1a22;color:var(--red)}
+.bar{height:8px;background:#0a1220;border-radius:4px;overflow:hidden;margin:6px 0}.bar i{display:block;height:100%;background:var(--cyan);width:0}
+.thumbs{display:flex;flex-wrap:wrap;gap:10px}.thumbs figure{margin:0;max-width:420px}.thumbs img,.prev{max-width:100%;border:1px solid var(--line);border-radius:4px}
+.fix{color:var(--muted);font-size:13px}ul{margin:6px 0 0 18px;padding:0}.best{background:#0f2a22}
+</style></head><body>
+<h1>Cafe Monitor — Diagnostics</h1>
+<small>This independent dashboard runs on port 8090. It checks configuration, video processing, people detection, cup candidates, and estimated laptop capacity. It does not change the main monitoring session.</small>
+<div class="tabs" id="tabs"></div>
+<div id="view"></div>
+<script>
+const $=(s,r=document)=>r.querySelector(s), esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const TABS=[['health','1. Health check'],['bench','2. Laptop capacity'],['cam','3. Camera + people'],['cups','4. Cup candidates'],['ent','5. Entrance test']];
+let cams=[];
+async function api(p,o){const r=await fetch(p,o);if(!r.ok){let d=r.statusText;try{d=(await r.json()).detail||d}catch{}throw new Error(d)}return r.json()}
+function job(kind,params,onProgress){return api('/api/jobs/'+kind,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(params||{})}).then(({job_id})=>new Promise((res,rej)=>{
+  const t=setInterval(async()=>{try{const j=await api('/api/jobs/'+job_id);onProgress(j);if(j.status==='done'){clearInterval(t);res(j.result)}if(j.status==='error'){clearInterval(t);rej(new Error(j.error))}}catch(e){clearInterval(t);rej(e)}},1000)}))}
+function runner(btn,out,kind,params,render){return async()=>{btn.disabled=true;out.innerHTML='<div class="bar"><i id="pb"></i></div><div class="muted" id="pm">Starting...</div>';
+  try{const r=await job(kind,typeof params==='function'?params():params,j=>{$('#pb',out).style.width=(j.progress*100)+'%';$('#pm',out).textContent=j.message});out.innerHTML=render(r)}
+  catch(e){out.innerHTML='<div class="b fail">ERROR</div> '+esc(e.message)}finally{btn.disabled=false}}}
+function show(tab){document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.k===tab));$('#view').innerHTML='';views[tab]($('#view'))}
+const views={
+health(v){v.innerHTML='<div class="card"><h2>Health check</h2><div class="row"><button class="go" id="g">Run checks</button><span class="muted">Instant checks; no model inference is run.</span></div><div id="o"></div></div>';
+  const run=async()=>{$('#o').innerHTML='Running checks...';try{const c=await api('/api/checks');const order={fail:0,warn:1,ok:2,info:3};c.sort((a,b)=>order[a.level]-order[b.level]);
+   const n=l=>c.filter(x=>x.level===l).length;$('#o').innerHTML=`<p><span class="b fail">${n('fail')} fail</span> <span class="b warn">${n('warn')} warn</span> <span class="b ok">${n('ok')} ok</span></p><table><tr><th></th><th>Check</th><th>Detail / fix</th></tr>`+
+   c.map(x=>`<tr><td><span class="b ${x.level}">${x.level.toUpperCase()}</span></td><td>${esc(x.title)}</td><td>${esc(x.detail)}${x.fix?`<div class="fix">Fix: ${esc(x.fix)}</div>`:''}</td></tr>`).join('')+'</table>'}catch(e){$('#o').textContent=e.message}};
+  $('#g').onclick=run;run()},
+bench(v){v.innerHTML='<div class="card"><h2>Laptop capacity benchmark</h2><p class="muted">Stop monitoring on the main dashboard first. This test takes about 1–2 minutes and measures video decoding, YOLO inference at 320/480/640, and estimated camera-load scenarios.</p><div class="row"><button class="go" id="g">Run benchmark</button></div><div id="o"></div></div>';
+  $('#g').onclick=runner($('#g'),$('#o'),'benchmark',{},r=>`<p>CPU threads: <b>${r.cpu_threads}</b> · decode: <b>${r.decode_ms_per_frame} ms/frame</b> · dashboard JPEG: <b>${r.encode_ms_per_frame} ms/frame</b></p>
+  <p>YOLO inference time per image: ${Object.entries(r.inference_ms_by_imgsz).map(([k,x])=>`imgsz ${k}: <b>${x} ms</b>`).join(' · ')}</p>
+  <table><tr><th>Scenario</th><th>AI checks/sec</th><th>imgsz</th><th>CPU use (est.)</th><th>Verdict</th></tr>${r.scenarios.map(s=>`<tr><td>${esc(s.name)}</td><td>${s.ai_checks_per_sec}</td><td>${s.imgsz}</td><td>${s.cpu_use_percent}%</td><td><span class="b ${s.verdict}">${s.verdict}</span></td></tr>`).join('')}</table>
+  <p class="muted">${esc(r.note)}</p>`)},
+cam(v){v.innerHTML=`<div class="card"><h2>Camera video and people detection</h2><p class="muted">YOLO checks eight sampled video frames to estimate visible people, compare detection at different input sizes, assess brightness/sharpness, and show annotated frames.</p>
+  <div class="row"><select id="c"></select><button class="go" id="g">Analyze</button></div><div id="o"></div></div>`;
+  $('#c').innerHTML=cams.map(c=>`<option value="${c.id}">Cam ${String(c.id).padStart(2,'0')} — ${esc(c.name)} (${c.role})${c.video_found?'':' [video file missing]'}</option>`).join('');
+  $('#g').onclick=runner($('#g'),$('#o'),'camera',()=>({camera_id:+$('#c').value}),r=>`<p><b>${esc(r.camera.name)}</b> — ${r.video.width}x${r.video.height} @ ${r.video.fps}fps, ${r.video.duration_sec}s · people density: <b>${esc(r.density)}</b> · brightness ${r.brightness} · sharpness ${r.sharpness}</p>
+   <table><tr><th>imgsz</th><th>People per frame</th><th>avg</th><th>max</th></tr>${Object.entries(r.sizes).map(([k,s])=>`<tr><td>${k}</td><td>${s.counts.join(', ')}</td><td>${s.mean}</td><td>${s.max}</td></tr>`).join('')}</table>
+   <ul>${r.findings.map(f=>`<li>${esc(f)}</li>`).join('')}</ul><div class="thumbs">${r.thumbnails.map(t=>`<figure><img src="${t.image}"><figcaption class="muted">t=${t.t}s ${t.cups!=null?'· cup boxes: '+t.cups:'· people: '+t.persons}</figcaption></figure>`).join('')}</div>`)},
+cups(v){v.innerHTML=`<div class="card"><h2>Cup reference-image test</h2><p class="muted">Runs the generic COCO model on images in data/cup_dataset/raw. This checks generic cup-like detections; it does not classify the café's exact cup types.</p><div class="row"><button class="go" id="g">Analyze images</button></div><div id="o"></div></div>`;
+  $('#g').onclick=runner($('#g'),$('#o'),'cups',{},r=>`<p>${r.photos_with_cup_like_detection} of ${r.photos} images contained at least one cup-like detection.</p><p class="muted">${esc(r.note)}</p><div class="thumbs">${r.rows.map(x=>`<figure>${x.image?`<img src="${x.image}">`:''}<figcaption class="muted">${esc(x.file)}<br>cup-like boxes: <b>${x.cup_like_boxes??'-'}</b> · ${esc(JSON.stringify(x.classes||{}))}</figcaption></figure>`).join('')}</div>`)},
+ent(v){v.innerHTML=`<div class="card"><h2>Entrance counting test</h2><p class="muted">The analyzer runs inference on Camera 07, then compares the same line counter across candidate line positions and AI rates. Count entries and exits manually from the clip and enter those numbers below for comparison.</p>
+  <div class="row">Manual count: In <input type="number" id="ei" min="0"> Out <input type="number" id="eo" min="0"> Image size <select id="sz"><option>320</option><option selected>480</option><option>640</option></select><button class="go" id="g">Run test</button></div><div id="o"></div></div>`;
+  $('#g').onclick=runner($('#g'),$('#o'),'entrance',()=>({imgsz:+$('#sz').value,expected_in:$('#ei').value,expected_out:$('#eo').value}),r=>{const best=r.expected.in!=null?Math.min(...r.table.map(x=>x.error)):null;
+   return `<p>${r.samples} samples @ ${r.sample_fps}/s · samples with no detected people: <b>${r.samples_with_nobody}</b> · maximum people in one sample: <b>${r.max_people_in_a_sample}</b></p>
+   <table><tr><th>Line</th><th>AI/sec</th><th>In</th><th>Out</th>${best!=null?'<th>error</th>':''}</tr>${r.table.map(x=>`<tr class="${best!=null&&x.error===best?'best':''}"><td>${esc(x.label==='CURRENT config'?'► CURRENT: ':'')}${esc(x.line)}</td><td>${x.ai_checks_per_sec}</td><td>${x.entries}</td><td>${x.exits}</td>${best!=null?`<td>${x.error}</td>`:''}</tr>`).join('')}</table>
+   ${r.preview?`<p><img class="prev" src="${r.preview}"></p>`:''}<p class="muted">${esc(r.note)}</p>`})}
+};
+(async()=>{$('#tabs').innerHTML=TABS.map(([k,t])=>`<button class="tab" data-k="${k}">${t}</button>`).join('');document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>show(t.dataset.k));
+ try{cams=await api('/api/cameras')}catch{}show('health')})();
+</script></body></html>

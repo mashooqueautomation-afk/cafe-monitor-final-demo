@@ -1,0 +1,45 @@
+@'
+# Environment secrets
+.env
+.env.*
+!.env.example
+
+# Customer recordings and reference images
+data/
+runtime/
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.webm
+*.m4v
+
+# Local databases and logs
+*.db
+*.sqlite
+*.sqlite3
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Frontend dependencies and build output
+node_modules/
+dist/
+build/
+
+# IDE and operating system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Model weights and generated datasets
+*.pt
+*.onnx
+runs/
+datasets/
+'@ | Set-Content -Encoding utf8 .gitignore
